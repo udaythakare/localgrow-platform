@@ -17,12 +17,11 @@ export default function ScanPage() {
     const [loading, setLoading] = useState(false);
     const [showCouponCard, setShowCouponCard] = useState(false);
     const [isRedeemed, setIsRedeemed] = useState(false);
+    const [isExpired, setIsExpired] = useState(false);
     const [validUntilDate, setValidUntilDate] = useState(null);
 
     const handleQRDetected = async (value) => {
-
         try {
-
             setLoading(true);
 
             setScanHistory(prev => [
@@ -31,7 +30,6 @@ export default function ScanPage() {
             ]);
 
             const data = JSON.parse(value);
-
             const couponId = data.couponId;
             const userId = data.userId;
 
@@ -39,38 +37,40 @@ export default function ScanPage() {
             const fetchedUserData = await getUserData(userId);
             const fetchCouponStatus = await getCouponStatus(couponId, userId);
 
-            setValidUntilDate(fetchCouponStatus.couponStatus.remaining_claim_time);
+            const isAlreadyRedeemed = fetchCouponStatus?.couponStatus?.coupon_status === "redeemed";
+            const isCampaignExpired = fetchedCouponData?.end_date
+                ? new Date(fetchedCouponData.end_date).getTime() < Date.now()
+                : false;
 
-            setIsRedeemed(
-                fetchCouponStatus.couponStatus.coupon_status === "redeemed"
-            );
+            setValidUntilDate(fetchedCouponData?.end_date || null);
+            setIsRedeemed(isAlreadyRedeemed);
+            setIsExpired(isCampaignExpired);
 
             setCouponData(fetchedCouponData);
-            setUserData(fetchedUserData.user);
+            setUserData(fetchedUserData?.user || null);
 
             setShowCouponCard(true);
-
         } catch (error) {
-
             console.error("Error processing QR code:", error);
-
         } finally {
-
             setLoading(false);
         }
     };
 
     const handleAccept = async () => {
+        if (!couponData?.id || !userData?.id) {
+            alert("Missing coupon or customer information");
+            return;
+        }
 
         const response = await acceptCoupon(couponData.id, userData.id);
 
         if (!response.success) {
-            alert(t?.scanner?.acceptError ?? "Error accepting coupon");
+            alert(response.error || t?.scanner?.acceptError || "Error accepting coupon");
             return;
         }
 
         alert(t?.scanner?.acceptSuccess ?? "Coupon accepted successfully!");
-
         setShowCouponCard(false);
     };
 
@@ -150,24 +150,33 @@ export default function ScanPage() {
 
                             </div>
 
-                            {isRedeemed && (
-
+                            {isRedeemed ? (
                                 <div className="flex justify-between font-bold">
-
                                     <span>
-
                                         {t?.scanner?.status ?? "Status"}
-
                                     </span>
-
                                     <span className="font-black bg-black text-white px-2 py-1 border-2 border-black transform -rotate-2">
-
                                         {t?.scanner?.alreadyRedeemed ?? "Already Redeemed"}
-
                                     </span>
-
                                 </div>
-
+                            ) : isExpired ? (
+                                <div className="flex justify-between font-bold">
+                                    <span>
+                                        {t?.scanner?.status ?? "Status"}
+                                    </span>
+                                    <span className="font-black bg-red-600 text-white px-2 py-1 border-2 border-black transform -rotate-2">
+                                        Campaign Expired
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="flex justify-between font-bold">
+                                    <span>
+                                        {t?.scanner?.status ?? "Status"}
+                                    </span>
+                                    <span className="font-black bg-emerald-600 text-white px-2 py-1 border-2 border-black transform -rotate-1">
+                                        Valid & Claimed
+                                    </span>
+                                </div>
                             )}
 
                         </div>
@@ -194,25 +203,21 @@ export default function ScanPage() {
 
                         </div>
 
-                        {!isRedeemed ? (
-
+                        {isRedeemed ? (
+                            <div className="mt-6 w-full bg-black text-white font-black py-4 px-6 border-4 border-black flex justify-center items-center text-xl uppercase">
+                                {t?.scanner?.alreadyRedeemed ?? "Coupon Already Redeemed"}
+                            </div>
+                        ) : isExpired ? (
+                            <div className="mt-6 w-full bg-red-600 text-white font-black py-4 px-6 border-4 border-black flex justify-center items-center text-xl uppercase">
+                                Campaign Expired — Cannot Redeem
+                            </div>
+                        ) : (
                             <button
                                 onClick={handleAccept}
                                 className="mt-6 w-full bg-[#df6824] text-black font-black py-4 px-6 border-4 border-black shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:translate-x-1 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all text-xl uppercase"
                             >
-
                                 {t?.scanner?.acceptCoupon ?? "Accept Coupon"}
-
                             </button>
-
-                        ) : (
-
-                            <div className="mt-6 w-full bg-black text-white font-black py-4 px-6 border-4 border-black flex justify-center items-center text-xl uppercase">
-
-                                {t?.scanner?.alreadyRedeemed ?? "Coupon Already Redeemed"}
-
-                            </div>
-
                         )}
 
                     </div>

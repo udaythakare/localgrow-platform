@@ -25,7 +25,7 @@ export const useCouponForm = (coupon) => {
         is_active: true,
         image_url: '',
         coupon_type: 'redeem_at_store', // always store redeem
-        redeem_duration: '5 minutes',
+        redeem_duration: null, // Deprecated: campaign end_date is authoritative
         max_claims: '',
         redemption_time_type: 'anytime',
         redemption_start_time: '09:00',

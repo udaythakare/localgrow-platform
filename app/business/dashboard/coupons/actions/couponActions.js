@@ -171,16 +171,16 @@ async function sendPushNotificationForNewCoupon(business, coupon, businessId) {
 
         console.log('Sending notification via API:', notificationData);
 
-        // Call your API endpoint
-        const response = await fetch(`http://localhost:3000/api/send-notification`, {
+        // Call your API endpoint (internal-only — passes the server secret)
+        const notifBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        const response = await fetch(`${notifBaseUrl}/api/send-notification`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'x-internal-secret': process.env.INTERNAL_API_SECRET || '',
                 Cookie: (await cookies()).toString()
             },
             body: JSON.stringify(notificationData),
-
-
         });
 
         if (!response.ok) {

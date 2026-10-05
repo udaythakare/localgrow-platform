@@ -48,6 +48,8 @@ export async function GET() {
       businessInfo: {
         ...business,
         ...location,
+        locationId: location.id,
+        businessId: business.id,
       },
     });
   } catch (error) {

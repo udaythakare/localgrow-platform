@@ -148,13 +148,6 @@ export default function CouponForm({ coupon }) {
 
                 {formData.coupon_type === 'redeem_at_store' && (
                     <>
-                        <RedemptionDurationSelector
-                            value={formData.redeem_duration}
-                            onChange={(duration) =>
-                                setFormData(prev => ({ ...prev, redeem_duration: duration }))
-                            }
-                        />
-
                         <RedemptionTimeSelector
                             timeType={formData.redemption_time_type}
                             onTimeTypeChange={(type) =>

@@ -144,7 +144,9 @@ export async function PUT(request, props) {
                             state: location.state,
                             postal_code: location.postal_code,
                             country: location.country,
-                            is_primary: location.is_primary || false
+                            is_primary: location.is_primary || false,
+                            latitude: location.latitude || null,
+                            longitude: location.longitude || null
                         })
                         .eq('id', location.id)
                         .eq('business_id', id);
@@ -162,7 +164,9 @@ export async function PUT(request, props) {
                             state: location.state,
                             postal_code: location.postal_code,
                             country: location.country,
-                            is_primary: location.is_primary || false
+                            is_primary: location.is_primary || false,
+                            latitude: location.latitude || null,
+                            longitude: location.longitude || null
                         });
 
                     if (insertLocError) throw insertLocError;

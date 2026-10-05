@@ -3,6 +3,8 @@ import { getUser, getUserId } from '@/helpers/userHelper'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY // Use service role for server-side operations
@@ -11,15 +13,15 @@ const supabase = createClient(
 // GET - Fetch user notifications
 export async function GET(request) {
   try {
-    // const { searchParams } = new URL(request.url)
-    // const userId = searchParams.get('userId')
-    // const limit = parseInt(searchParams.get('limit') || '20')
-    // const unreadOnly = searchParams.get('unreadOnly') === 'true'
+    const { searchParams } = new URL(request.url)
+    const limit = parseInt(searchParams.get('limit') || '20', 10)
+    const unreadOnly = searchParams.get('unreadOnly') === 'true'
 
-    const userId = await getUserId();
+    const rawUserId = await getUserId();
+    const userId = typeof rawUserId === 'string' && rawUserId.trim().length > 0 ? rawUserId.trim() : null;
 
     if (!userId) {
-      return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+      return NextResponse.json({ notifications: [] }, { status: 200 })
     }
 
     let query = supabase
@@ -39,7 +41,7 @@ export async function GET(request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ notifications: data })
+    return NextResponse.json({ notifications: data || [] })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
@@ -51,8 +53,8 @@ export async function POST(request) {
     const body = await request.json()
     const { message, title, type = 'info' } = body
 
-    // const user_id = await getUserId();\
-    const user_id = "fee7f9db-a31c-41ff-8f9f-82df2abbad79"
+    const rawUserId = await getUserId();
+    const user_id = typeof rawUserId === 'string' && rawUserId.trim().length > 0 ? rawUserId.trim() : null;
 
     if (!message || !user_id) {
       return NextResponse.json({ error: 'Message and user_id required' }, { status: 400 })
@@ -78,9 +80,10 @@ export async function PATCH(request) {
   try {
     const body = await request.json()
     const { notificationId, markAllAsRead } = body
-    const userId = await getUserId();
+    const rawUserId = await getUserId();
+    const userId = typeof rawUserId === 'string' && rawUserId.trim().length > 0 ? rawUserId.trim() : null;
     if (!userId) {
-      return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+      return NextResponse.json({ error: 'User ID required' }, { status: 401 })
     }
 
     if (markAllAsRead) {

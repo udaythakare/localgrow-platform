@@ -33,20 +33,30 @@ export default function DashboardLayout({ children }) {
                     return;
                 }
 
-                // ← NEW: Check business approval status before showing dashboard
+                // Check business approval status and existence before showing dashboard
                 try {
                     const res = await fetch('/api/vendors/my-business')
                     const data = await res.json()
 
+                    if (!data?.data) {
+                        router.push('/u/profile/apply-for-business')
+                        return
+                    }
+
                     if (data?.data?.status === 'pending') {
-                    router.push('/business/pending')
-                     return
-                         }
+                        router.push('/business/pending')
+                        return
+                    }
 
                     if (data?.data?.status === 'rejected') {
                         router.push('/business/rejected')
-                     return
-                          }
+                        return
+                    }
+
+                    if (data?.data?.status !== 'approved') {
+                        router.push('/u/profile/apply-for-business')
+                        return
+                    }
                 } catch (statusError) {
                     // If status check fails, still allow access
                     // Don't block the dashboard for a network error

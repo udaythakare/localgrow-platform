@@ -98,35 +98,40 @@ export async function fetchUserCoupons() {
 
 export async function updateUserLocation(locationData) {
     try {
-        const userId = await getUserId();
+        const rawUserId = await getUserId();
+        const userId = typeof rawUserId === 'string' && rawUserId.trim().length > 0 ? rawUserId.trim() : null;
         if (!userId) {
             return { success: false, message: 'Login first' };
         }
 
-        // console.log(userId, 'this is userId in updateUserLocation');
-
-        // Validate in one step with early return
-        const requiredFields = ['address', 'city', 'state', 'postal_code'];
-        const missingField = requiredFields.find(field => !locationData[field]);
-        if (missingField) {
-            return { success: false, error: `${missingField} is required` };
+        // Validate that city is present (crucial for /coupons and locality filtering)
+        if (!locationData || !locationData.city || typeof locationData.city !== 'string' || locationData.city.trim().length === 0) {
+            return { success: false, error: 'City is required' };
         }
 
-        // Use a single upsert operation instead of checking first
+        const lat = typeof locationData.latitude === 'number'
+            ? locationData.latitude
+            : (locationData.latitude !== undefined && locationData.latitude !== null && locationData.latitude !== '' ? parseFloat(locationData.latitude) : null);
+        const lon = typeof locationData.longitude === 'number'
+            ? locationData.longitude
+            : (locationData.longitude !== undefined && locationData.longitude !== null && locationData.longitude !== '' ? parseFloat(locationData.longitude) : null);
+
+        const upsertData = {
+            user_id: userId,
+            city: locationData.city.trim(),
+            address: locationData.address ? String(locationData.address).trim() : null,
+            state: locationData.state ? String(locationData.state).trim() : null,
+            area: locationData.area ? String(locationData.area).trim() : null,
+            postal_code: locationData.postal_code ? String(locationData.postal_code).trim() : null,
+            country: locationData.country ? String(locationData.country).trim() : 'India',
+            latitude: (lat !== null && !isNaN(lat)) ? lat : null,
+            longitude: (lon !== null && !isNaN(lon)) ? lon : null,
+            is_primary: true,
+        };
+
         const { error } = await supabaseAdmin
             .from('user_locations')
-            .upsert(
-                {
-                    user_id: userId,
-                    address: locationData.address,
-                    city: locationData.city,
-                    state: locationData.state,
-                    postal_code: locationData.postal_code,
-                    is_primary: true,
-                    area: locationData.area || null,
-                },
-                { onConflict: 'user_id' }
-            );
+            .upsert(upsertData, { onConflict: 'user_id' });
 
         if (error) {
             throw new Error(`Database error: ${error.message}`);
@@ -134,7 +139,7 @@ export async function updateUserLocation(locationData) {
 
         revalidatePath('/u/profile');
 
-        return { success: true };
+        return { success: true, data: upsertData };
     } catch (error) {
         console.error('Error updating user location:', error);
         return { success: false, error: error.message };

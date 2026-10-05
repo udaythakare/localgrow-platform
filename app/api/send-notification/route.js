@@ -1,4 +1,4 @@
-// api/send-notifications/route.js
+// api/send-notification/route.js
 import { supabase } from '@/lib/supabase';
 import webpush from 'web-push';
 
@@ -10,22 +10,45 @@ webpush.setVapidDetails(
 
 export async function POST(request) {
     try {
+        // ── 1. Internal-secret guard ────────────────────────────────────────
+        const internalSecret = process.env.INTERNAL_API_SECRET;
+        if (!internalSecret) {
+            console.error('[send-notification] INTERNAL_API_SECRET is not set');
+            return Response.json({ error: 'Server misconfiguration' }, { status: 500 });
+        }
+
+        const providedSecret = request.headers.get('x-internal-secret');
+        if (!providedSecret || providedSecret !== internalSecret) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // ── 2. Parse and validate payload ───────────────────────────────────
         const { userId, title, body, url, tag, data: notificationData } = await request.json();
 
-        console.log('reached till here','**************************************')
+        // Broadcast (no userId) is disabled for now — only per-user notifications
+        // are permitted from internal callers. Uncomment the block below and add
+        // a superadmin role check if broadcast support is ever needed.
+        if (!userId) {
+            return Response.json(
+                { error: 'userId is required; broadcast notifications are not permitted' },
+                { status: 400 }
+            );
+        }
+
+        if (
+            typeof title !== 'string' || title.length > 200 ||
+            typeof body !== 'string' || body.length > 500
+        ) {
+            return Response.json({ error: 'Invalid payload length' }, { status: 400 });
+        }
 
         console.log('Received notification request:', { userId, title, body, url, tag });
 
-        // Get push subscriptions based on strategy
-        let query = supabase.from('push_subscriptions').select('subscription');
-
-        if (userId) {
-            // Send to specific user
-            query = query.eq('user_id', userId);
-        }
-        // If no userId provided, send to all users (broadcast)
-
-        const { data: subscriptions, error } = await query;
+        // ── 3. Fetch target user's push subscriptions ───────────────────────
+        const { data: subscriptions, error } = await supabase
+            .from('push_subscriptions')
+            .select('subscription')
+            .eq('user_id', userId);
 
         console.log(`Found ${subscriptions?.length || 0} subscriptions`);
 
@@ -37,11 +60,11 @@ export async function POST(request) {
         if (!subscriptions || subscriptions.length === 0) {
             return Response.json({
                 error: 'No subscriptions found',
-                message: userId ? `No subscriptions for user ${userId}` : 'No subscriptions in database'
+                message: `No subscriptions for user ${userId}`
             }, { status: 404 });
         }
 
-        // Prepare the push payload
+        // ── 4. Send push notifications ──────────────────────────────────────
         const payload = JSON.stringify({
             title,
             body,
@@ -54,7 +77,6 @@ export async function POST(request) {
 
         console.log('Sending payload:', payload);
 
-        // Send notifications to all subscriptions
         const promises = subscriptions.map(async (sub, index) => {
             try {
                 await webpush.sendNotification(sub.subscription, payload);
@@ -75,7 +97,6 @@ export async function POST(request) {
 
         const results = await Promise.allSettled(promises);
 
-        // Count successful and failed notifications
         const successful = results.filter(result =>
             result.status === 'fulfilled' && result.value.success
         ).length;
@@ -107,4 +128,4 @@ export async function POST(request) {
             message: error.message
         }, { status: 500 });
     }
-}
+}

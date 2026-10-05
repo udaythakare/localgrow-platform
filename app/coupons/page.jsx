@@ -1,98 +1,100 @@
 import GlobalCouponSection from "@/components/GlobalCouponSection";
 import NotificationToggle from "@/components/NotificationToggle";
 import { getUserId } from "@/helpers/userHelper";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import Link from "next/link";
+import { Sparkles, ArrowDown, ShieldCheck, Store, Users } from "lucide-react";
 
 export default async function CouponPage() {
   const userId = await getUserId();
-  const supabase = await createSupabaseServerClient();
 
   return (
-    <div className="min-h-screen bg-[#f6f6fb]">
+    <div className="min-h-screen bg-[#f8fafc]">
 
-      {/* ================= HERO SECTION ================= */}
-      <section className="relative w-full flex items-center justify-center overflow-hidden"
-        style={{ minHeight: "clamp(360px, 55vw, 620px)" }}>
+      {/* ================= HERO DISCOVERY BANNER ================= */}
+      <section className="relative w-full overflow-hidden bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 text-white py-14 sm:py-20 lg:py-24">
+        {/* Subtle background glow effects */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
+          <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-500 rounded-full blur-[128px]" />
+          <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-violet-600 rounded-full blur-[128px]" />
+        </div>
 
-        {/* Background Image */}
-        <img
-          src="/herosection.png"
-          alt="Hero"
-          className="absolute inset-0 w-full h-full object-cover object-center"
-        />
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
 
-        {/* Dark Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/80 z-[1]" />
-
-        {/* Hero Content */}
-        <div className="relative z-[2] w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white py-10 sm:py-14">
-
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-[11px] sm:text-sm font-semibold tracking-wide text-white/90 mb-4 sm:mb-6">
-            <span className="w-2 h-2 rounded-full bg-[#6c4bff] animate-pulse flex-shrink-0" />
-            New deals added daily
+          {/* Top Deal Pill */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-xs sm:text-sm font-semibold text-indigo-200 mb-6 shadow-sm">
+            <Sparkles size={14} className="text-amber-300 animate-pulse" />
+            <span>Verified Local Discounts Added Daily</span>
           </div>
 
           {/* Heading */}
-          <h1 className="text-2xl xs:text-3xl sm:text-5xl md:text-6xl font-extrabold leading-tight tracking-tight">
-            Discover The Best
-            <br />
-            <span className="text-[#a78bfa]">Local Deals</span> Near You
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.15] tracking-tight text-white max-w-4xl mx-auto">
+            Discover The Best{" "}
+            <span className="bg-gradient-to-r from-indigo-300 via-purple-300 to-amber-200 bg-clip-text text-transparent">
+              Local Deals
+            </span>{" "}
+            Near You
           </h1>
 
           {/* Subtext */}
-          <p className="mt-3 sm:mt-5 text-gray-300 max-w-xl mx-auto text-xs sm:text-base md:text-lg leading-relaxed px-2">
-            Claim exclusive coupons from nearby stores and enjoy amazing
-            discounts while supporting your favorite local businesses.
+          <p className="mt-4 sm:mt-5 text-slate-300 max-w-2xl mx-auto text-sm sm:text-base md:text-lg leading-relaxed font-normal">
+            Claim instant digital coupons from top neighborhood merchants. Save money on dining, shopping, and everyday services while supporting local shops.
           </p>
 
           {/* CTA Buttons */}
-          <div className="mt-6 sm:mt-8 flex justify-center gap-3 flex-wrap">
+          <div className="mt-8 flex justify-center items-center gap-3 flex-wrap">
             <Link
               href="#coupons"
-              className="px-5 sm:px-7 py-2.5 sm:py-3 bg-[#3716a8] text-white font-bold rounded-xl shadow-lg hover:bg-[#4d2bc7] active:scale-95 hover:scale-105 hover:shadow-[0_8px_24px_rgba(55,22,168,0.5)] transition-all duration-200 text-sm sm:text-base"
+              className="inline-flex items-center gap-2 px-6 sm:px-7 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition-all text-sm sm:text-base"
             >
-              Explore Coupons
+              <span>Explore Deals</span>
+              <ArrowDown size={16} />
             </Link>
             <Link
               href="/about"
-              className="px-5 sm:px-7 py-2.5 sm:py-3 border border-white/40 text-white rounded-xl backdrop-blur-sm hover:bg-white/15 hover:border-white/60 active:scale-95 transition-all duration-200 text-sm sm:text-base"
+              className="inline-flex items-center px-6 sm:px-7 py-3 border border-white/20 hover:border-white/40 hover:bg-white/10 active:scale-[0.98] text-white font-medium rounded-xl backdrop-blur-sm transition-all text-sm sm:text-base"
             >
               Learn More
             </Link>
           </div>
 
-          {/* Stats */}
-          <div className="mt-8 sm:mt-12 grid grid-cols-3 gap-2 sm:gap-6 md:gap-10 text-center max-w-lg mx-auto sm:max-w-none">
-            {[
-              { value: "500+", label: "Active Coupons" },
-              { value: "150+", label: "Local Shops" },
-              { value: "10K+", label: "Happy Users" },
-            ].map(({ value, label }) => (
-              <div key={label} className="flex flex-col items-center">
-                <div className="text-xl xs:text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-                  {value}
-                </div>
-                <div className="mt-0.5 sm:mt-1 text-gray-400 text-[10px] sm:text-sm font-medium leading-tight">
-                  {label}
-                </div>
-                <div className="mt-1.5 sm:mt-2 w-6 sm:w-8 h-0.5 rounded-full bg-[#6c4bff] mx-auto" />
+          {/* Marketplace Stats Row */}
+          <div className="mt-12 sm:mt-16 grid grid-cols-3 gap-3 sm:gap-6 max-w-2xl mx-auto pt-8 border-t border-white/10">
+            <div className="flex flex-col items-center">
+              <div className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
+                Daily
               </div>
-            ))}
+              <div className="text-slate-400 text-xs sm:text-sm font-medium mt-0.5">
+                Fresh Offers
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center border-x border-white/10">
+              <div className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
+                150+
+              </div>
+              <div className="text-slate-400 text-xs sm:text-sm font-medium mt-0.5">
+                Verified Stores
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <div className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
+                10K+
+              </div>
+              <div className="text-slate-400 text-xs sm:text-sm font-medium mt-0.5">
+                Happy Savers
+              </div>
+            </div>
           </div>
 
         </div>
       </section>
 
-      {/* ================= NOTIFICATIONS ================= */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6">
-        <NotificationToggle />
-      </div>
+      {/* ================= NOTIFICATIONS TOAST/BANNER ================= */}
+      <NotificationToggle />
 
-      {/* ================= COUPONS ================= */}
-      {/* pb-24 ensures content clears the bottom nav bar on mobile/PWA */}
-      <div id="coupons" className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6 pb-24 md:pb-10">
+      {/* ================= MAIN COUPON SECTION ================= */}
+      <div id="coupons" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 sm:mt-8 pb-24 md:pb-12">
         <GlobalCouponSection userId={userId} />
       </div>
 

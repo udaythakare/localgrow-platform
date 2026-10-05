@@ -35,7 +35,9 @@ export async function GET(request) {
         longitude,
         business_locations!inner (
           city, 
-          state
+          state,
+          latitude,
+          longitude
         )
       `)
             .order('created_at', { ascending: false });
@@ -52,8 +54,8 @@ export async function GET(request) {
             email: business.email,
             city: business.business_locations[0]?.city,
             state: business.business_locations[0]?.state,
-            latitude: business.latitude,
-            longitude: business.longitude,
+            latitude: business.business_locations[0]?.latitude || null,
+            longitude: business.business_locations[0]?.longitude || null,
         }));
 
         console.log('Formatted Businesses:', formattedBusinesses);
@@ -130,7 +132,9 @@ export async function POST(request) {
                 state: location.state,
                 postal_code: location.postal_code,
                 country: location.country,
-                is_primary: location.is_primary || false
+                is_primary: location.is_primary || false,
+                latitude: location.latitude || null,
+                longitude: location.longitude || null
             }));
 
         if (locationsToInsert.length > 0) {

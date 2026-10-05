@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 import {
@@ -11,32 +11,29 @@ import {
   User as UserIcon,
   LogOut as LogOutIcon,
   ChevronDown,
-  Filter as FilterIcon,
   Store,
   TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 
-import GlobalFilterSection from './GlobalFilterSection';
 import InternalNotifications from './InternalNotifications';
 
 export default function Navbar({ userId }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
 
   const router = useRouter();
+  const pathname = usePathname();
   const profileRef = useRef(null);
   const mobileMenuRef = useRef(null);
-  const filtersRef = useRef(null);
 
   /* CLICK OUTSIDE */
   useEffect(() => {
     function handleClickOutside(event) {
       if (profileRef.current && !profileRef.current.contains(event.target)) setProfileOpen(false);
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) setMobileMenuOpen(false);
-      if (filtersRef.current && !filtersRef.current.contains(event.target)) setFiltersOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -101,82 +98,72 @@ export default function Navbar({ userId }) {
   };
 
   const navLinks = [
-    { href: '/', label: 'Home' },
     { href: '/coupons', label: 'Coupons' },
+    { href: '/nearby', label: 'Nearby' },
     { href: '/about', label: 'About' },
     { href: '/u/profile', label: 'Profile' },
     { href: '/u/profile/my-coupons', label: 'My Coupons' },
   ];
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b-2 border-black shadow-[0_2px_0_0_rgba(0,0,0,1)]">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-        <div className="flex items-center justify-between h-14 sm:h-16">
+    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.03)]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
 
           {/* ── Logo ── */}
           <Link
             href="/"
-            className="flex-shrink-0 text-lg sm:text-xl font-extrabold text-[#3716a8] tracking-tight hover:opacity-80 transition"
+            className="flex-shrink-0 flex items-center gap-2 group transition"
           >
-            LocalGrow
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-sm shadow-indigo-200 group-hover:scale-105 transition-transform">
+              <Sparkles size={16} />
+            </div>
+            <span className="text-xl font-extrabold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">
+              Local<span className="text-indigo-600">Grow</span>
+            </span>
           </Link>
 
           {/* ── Desktop Nav Links ── */}
-          <div className="hidden lg:flex items-center gap-1 text-sm font-medium">
-            {navLinks.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className="px-3 py-2 rounded-lg text-gray-700 hover:bg-[#3716a8]/10 hover:text-[#3716a8] transition"
-              >
-                {label}
-              </Link>
-            ))}
+          <div className="hidden lg:flex items-center gap-1.5 text-sm font-medium">
+            {navLinks.map(({ href, label }) => {
+              const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href));
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
+                    isActive
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100/70'
+                  }`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
           </div>
 
           {/* ── Right Actions ── */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-2.5">
 
             {/* Notifications */}
             {userId && <InternalNotifications userId={userId} />}
 
-            {/* Filters — hidden on mobile (BottomBar handles it) */}
-            <div ref={filtersRef} className="relative hidden sm:block">
-              <button
-                onClick={() => setFiltersOpen(!filtersOpen)}
-                className="flex items-center gap-1.5 px-3 py-2 text-white bg-[#3716a8] rounded-lg
-                  hover:bg-[#4d2bc7] active:scale-95 transition-all text-sm font-semibold"
-              >
-                <FilterIcon size={15} />
-                <span className="hidden md:inline">Filters</span>
-                <ChevronDown size={14} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {filtersOpen && (
-                <>
-                  <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setFiltersOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border-2 border-black z-50">
-                    <GlobalFilterSection />
-                  </div>
-                </>
-              )}
-            </div>
-
             {/* Apply Business — desktop only */}
             <button
               onClick={handleApplyBusiness}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border-2 border-[#3716a8]
-                text-[#3716a8] rounded-lg hover:bg-[#3716a8] hover:text-white active:scale-95 transition-all"
+              className="hidden lg:flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold border border-slate-200
+                text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-300 rounded-xl active:scale-[0.98] shadow-sm transition-all"
             >
-              <Store size={15} />
+              <Store size={15} className="text-indigo-600" />
               Business
             </button>
 
             {/* Become Investor — desktop only */}
             <button
               onClick={handleBecomeInvestor}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white
-                bg-[#3716a8] rounded-lg hover:bg-[#4d2bc7] active:scale-95 transition-all"
+              className="hidden lg:flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white
+                bg-indigo-600 hover:bg-indigo-700 rounded-xl active:scale-[0.98] shadow-sm hover:shadow transition-all"
             >
               <TrendingUp size={15} />
               Investor
@@ -187,49 +174,53 @@ export default function Navbar({ userId }) {
               <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-gray-100 active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-slate-100/80 active:scale-95 transition-all"
                   aria-label="Profile menu"
                 >
-                  <div className="w-8 h-8 rounded-full bg-[#3716a8] border-2 border-black flex items-center justify-center text-white shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center ring-2 ring-indigo-100 shadow-sm">
                     <UserIcon size={15} />
                   </div>
-                  <ChevronDown size={14} className={`hidden sm:block transition-transform text-gray-600 ${profileOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={14} className={`hidden sm:block transition-transform text-slate-500 ${profileOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-2xl border-2 border-black overflow-hidden z-50">
-                    <div className="px-4 py-3 border-b-2 border-black bg-[#3716a8]/5">
-                      <p className="font-bold text-sm text-gray-900 truncate">
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 divide-y divide-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-4 py-3 bg-slate-50/70">
+                      <p className="font-bold text-sm text-slate-900 truncate">
                         {user?.username || user?.full_name || 'User'}
                       </p>
-                      <p className="text-xs text-gray-500 truncate mt-0.5">
+                      <p className="text-xs text-slate-500 truncate mt-0.5">
                         {user?.email || session?.user?.email}
                       </p>
                     </div>
-                    <Link
-                      href="/u/profile"
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      <UserIcon size={15} />
-                      Profile
-                    </Link>
-                    <button
-                      onClick={handleSignOut}
-                      className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 border-t border-gray-100 transition"
-                    >
-                      <LogOutIcon size={15} />
-                      Sign Out
-                    </button>
+                    <div className="py-1">
+                      <Link
+                        href="/u/profile"
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <UserIcon size={15} />
+                        Profile
+                      </Link>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition"
+                      >
+                        <LogOutIcon size={15} />
+                        Sign Out
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Hamburger — visible on lg and below, but only when no session uses it */}
+            {/* Hamburger for mobile */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 active:scale-95 transition-all"
+              className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 active:scale-95 transition-all"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <XIcon size={22} /> : <MenuIcon size={22} />}
@@ -243,65 +234,67 @@ export default function Navbar({ userId }) {
       {mobileMenuOpen && (
         <div
           ref={mobileMenuRef}
-          className="lg:hidden border-t-2 border-black bg-white shadow-lg"
+          className="lg:hidden border-t border-slate-100 bg-white shadow-xl animate-in slide-in-from-top-2 duration-150"
         >
-          <div className="max-w-7xl mx-auto px-3 py-2 flex flex-col">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-1">
 
-            {navLinks.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className="px-4 py-3 text-sm font-medium text-gray-800 hover:bg-[#3716a8]/8 hover:text-[#3716a8] rounded-lg transition"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {label}
-              </Link>
-            ))}
+            {navLinks.map(({ href, label }) => {
+              const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href));
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl transition ${
+                    isActive
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-700 hover:bg-slate-50 hover:text-indigo-600'
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {label}
+                </Link>
+              );
+            })}
 
-            <div className="h-px bg-gray-200 my-2" />
+            <div className="h-px bg-slate-100 my-2" />
 
-            {/* Filters in mobile menu */}
-            <div className="sm:hidden px-2 pb-2">
-              <GlobalFilterSection />
-            </div>
-
-            <div className="flex gap-2 px-2 pb-3 sm:hidden">
+            <div className="flex gap-2 pb-2 sm:hidden">
               <button
                 onClick={handleApplyBusiness}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold
-                  border-2 border-[#3716a8] text-[#3716a8] rounded-lg hover:bg-[#3716a8] hover:text-white
-                  active:scale-95 transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold
+                  border border-slate-200 text-slate-700 bg-white rounded-xl hover:bg-slate-50
+                  active:scale-95 transition-all shadow-sm"
               >
-                <Store size={15} />
+                <Store size={15} className="text-indigo-600" />
                 Business
               </button>
               <button
                 onClick={handleBecomeInvestor}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold
-                  bg-[#3716a8] text-white rounded-lg hover:bg-[#4d2bc7]
-                  active:scale-95 transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold
+                  bg-indigo-600 text-white rounded-xl hover:bg-indigo-700
+                  active:scale-95 transition-all shadow-sm"
               >
                 <TrendingUp size={15} />
                 Investor
               </button>
             </div>
 
-            {/* Show Business/Investor in menu for sm–lg too */}
-            <div className="hidden sm:flex gap-2 px-2 pb-3">
+            {/* Show Business/Investor in menu for sm–lg */}
+            <div className="hidden sm:flex gap-2 pb-2">
               <button
                 onClick={handleApplyBusiness}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold
-                  border-2 border-[#3716a8] text-[#3716a8] rounded-lg hover:bg-[#3716a8] hover:text-white
-                  active:scale-95 transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold
+                  border border-slate-200 text-slate-700 bg-white rounded-xl hover:bg-slate-50
+                  active:scale-95 transition-all shadow-sm"
               >
-                <Store size={15} />
+                <Store size={15} className="text-indigo-600" />
                 Apply Business
               </button>
               <button
                 onClick={handleBecomeInvestor}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold
-                  bg-[#3716a8] text-white rounded-lg hover:bg-[#4d2bc7]
-                  active:scale-95 transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold
+                  bg-indigo-600 text-white rounded-xl hover:bg-indigo-700
+                  active:scale-95 transition-all shadow-sm"
               >
                 <TrendingUp size={15} />
                 Become Investor

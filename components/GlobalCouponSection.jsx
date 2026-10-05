@@ -13,7 +13,7 @@ import { EmptyState } from './GlobalCouponComp/EmptyState';
 import { LoadingSpinner } from './GlobalCouponComp/LoadingSpinner';
 import QRModal from '@/app/u/profile/components/QRModal';
 import { ConfirmationModal } from './ConfirmationModal';
-import { ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutGrid, Timer, Sparkles, X, ArrowUpDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 // ── emoji map for categories ──────────────────────────────────────────────────
@@ -42,31 +42,16 @@ function getCategoryIcon(name = '') {
 function CategoryPill({ category, isActive, onClick }) {
     return (
         <button
+            type="button"
             onClick={() => onClick(category)}
             aria-pressed={isActive}
-            style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '7px',
-                padding: '8px 16px',
-                borderRadius: '24px',
-                border: `1.5px solid ${isActive ? '#3716a8' : '#e5e7eb'}`,
-                background: isActive ? '#3716a8' : 'white',
-                color: isActive ? 'white' : '#374151',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                flexShrink: 0,
-                boxShadow: isActive
-                    ? '0 4px 16px rgba(55,22,168,0.35)'
-                    : '0 1px 4px rgba(0,0,0,0.06)',
-                transform: isActive ? 'translateY(-1px)' : 'none',
-                transition: 'all 0.18s ease',
-                fontFamily: 'inherit',
-            }}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                isActive
+                    ? 'bg-indigo-600 text-white shadow-sm -translate-y-0.5'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 shadow-xs'
+            }`}
         >
-            <span style={{ fontSize: '1rem', lineHeight: 1 }}>
+            <span className="text-sm leading-none">
                 {getCategoryIcon(category.name)}
             </span>
             <span>{category.name}</span>
@@ -83,15 +68,15 @@ const GlobalCouponSection = ({ userId }) => {
     const [categories, setCategories] = useState([]);
     const [catLoading, setCatLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState(null); // null = All
-    const [filteredCoupons, setFilteredCoupons] = useState(null); // null = show all from hook
-    const [catFetching, setCatFetching] = useState(false);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
     const scrollRef = useRef(null);
 
-    // ── Existing hooks (unchanged) ────────────────────────────────────────
+    // ── Existing hooks ────────────────────────────────────────────────────
     const {
         coupons,
+        expiresSoonCoupons = [],
+        forYouCoupons = [],
         loading,
         lastRefreshed,
         error,
@@ -101,12 +86,11 @@ const GlobalCouponSection = ({ userId }) => {
         locationName,
         setError,
         refreshCouponData,
-        clearFilters,
         loadMoreCoupons,
-    } = useCouponData();
+    } = useCouponData(selectedCategory?.id);
 
-    // When a category is active show filteredCoupons, otherwise show hook coupons
-    const displayCoupons = filteredCoupons !== null ? filteredCoupons : coupons;
+    // Display coupons are directly driven by useCouponData with category and locality
+    const displayCoupons = coupons;
 
     const {
         claimingCoupons,
@@ -114,131 +98,93 @@ const GlobalCouponSection = ({ userId }) => {
         showModal,
         setShowModal,
         handleClaimCouponClick,
-        handleConfirmClaim
+        handleConfirmClaim,
     } = useCouponClaim(refreshCouponData);
+
+    const isCouponClaimed = (couponId) => {
+        if (!couponId) return false;
+        const allLoaded = [...(coupons || []), ...(forYouCoupons || []), ...(expiresSoonCoupons || [])];
+        const found = allLoaded.find((c) => c.id === couponId);
+        return Boolean(found?.is_claimed);
+    };
 
     const {
         isQROpen,
         selectedCoupon,
         qrData,
-        showConfirmation,
-        setShowConfirmation,
         showQrCode,
-        closeQRModal
+        closeQRModal,
+        showConfirmation,
     } = useQRCode();
 
-    const [targetRef, isFetchingMore] = useInfiniteScroll(loadMoreCoupons, hasMore);
-
-    useRealtimeUpdates(
-        isQROpen,
-        selectedCoupon,
-        refreshCouponData,
-        setShowConfirmation,
-        closeQRModal
+    // ── Infinite scroll ───────────────────────────────────────────────────
+    const { targetRef, isFetchingMore } = useInfiniteScroll(
+        loadMoreCoupons,
+        hasMore,
+        loading
     );
 
-    // ── Load categories from Supabase ─────────────────────────────────────
+    // ── Realtime updates ──────────────────────────────────────────────────
+    useRealtimeUpdates({
+        onCouponChange: () => refreshCouponData(),
+        onClaimChange: () => refreshCouponData(),
+    });
+
+    // ── Fetch active categories from Supabase ─────────────────────────────
     useEffect(() => {
-        const loadCategories = async () => {
-            setCatLoading(true);
+        let isMounted = true;
+        async function fetchCategories() {
             try {
+                setCatLoading(true);
                 const { data, error } = await supabase
                     .from('business_categories')
                     .select('id, name')
-                    .order('name', { ascending: true });
-
-                if (!error && data) setCategories(data);
-            } catch (e) {
-                console.error('Failed to load categories:', e);
+                    .order('name');
+                if (error) throw error;
+                if (isMounted) setCategories(data || []);
+            } catch (err) {
+                console.error('[GlobalCouponSection] category fetch error:', err);
             } finally {
-                setCatLoading(false);
+                if (isMounted) setCatLoading(false);
             }
-        };
-        loadCategories();
+        }
+        fetchCategories();
+        return () => { isMounted = false; };
     }, []);
 
-    // ── Scroll arrow visibility ───────────────────────────────────────────
-    const checkScroll = () => {
+    // ── Scroll arrows visibility check ────────────────────────────────────
+    const updateScrollButtons = () => {
         const el = scrollRef.current;
         if (!el) return;
-        setCanScrollLeft(el.scrollLeft > 10);
-        setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 10);
+        setCanScrollLeft(el.scrollLeft > 4);
+        setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
     };
 
     useEffect(() => {
+        updateScrollButtons();
         const el = scrollRef.current;
-        if (!el) return;
-        checkScroll();
-        el.addEventListener('scroll', checkScroll);
-        window.addEventListener('resize', checkScroll);
+        if (el) el.addEventListener('scroll', updateScrollButtons, { passive: true });
         return () => {
-            el.removeEventListener('scroll', checkScroll);
-            window.removeEventListener('resize', checkScroll);
+            if (el) el.removeEventListener('scroll', updateScrollButtons);
         };
-    }, [categories]);
+    }, [categories, catLoading]);
 
-    const scrollBy = (dir) => {
-        scrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+    const scrollBy = (direction) => {
+        const el = scrollRef.current;
+        if (el) el.scrollBy({ left: direction * 240, behavior: 'smooth' });
     };
 
-    // ── Category filter logic ─────────────────────────────────────────────
-    const handleCategoryClick = async (cat) => {
-        // Toggle off if same category clicked again
-        if (selectedCategory?.id === cat.id) {
+    // ── Handlers ──────────────────────────────────────────────────────────
+    const handleCategoryClick = (category) => {
+        if (selectedCategory?.id === category.id) {
             setSelectedCategory(null);
-            setFilteredCoupons(null);
-            return;
-        }
-
-        setSelectedCategory(cat);
-        setCatFetching(true);
-
-        try {
-            const { data: businesses } = await supabase
-                .from('businesses')
-                .select('id')
-                .eq('category_id', cat.id);
-
-            if (!businesses || businesses.length === 0) {
-                setFilteredCoupons([]);
-                return;
-            }
-
-            const bizIds = businesses.map(b => b.id);
-
-            const { data: categoryCoupons } = await supabase
-                .from('coupons')
-                .select(`
-                    *,
-                    businesses(
-                        name,
-                        business_locations(
-                            address, area, city, state, postal_code
-                        )
-                    )
-                `)
-                .in('business_id', bizIds)
-                .eq('is_active', true)
-                .order('created_at', { ascending: false });
-
-            setFilteredCoupons(categoryCoupons || []);
-        } catch (e) {
-            console.error('Error filtering by category:', e);
-            setFilteredCoupons([]);
-        } finally {
-            setCatFetching(false);
+        } else {
+            setSelectedCategory(category);
         }
     };
 
-    const handleClearCategory = async () => {
+    const handleClearCategory = () => {
         setSelectedCategory(null);
-        setFilteredCoupons(null);
-    };
-
-    // ── Utilities ─────────────────────────────────────────────────────────
-    const isCouponClaimed = (couponId) => {
-        const coupon = displayCoupons.find(c => c.id === couponId);
-        return coupon?.is_claimed || false;
     };
 
     const toggleDetails = (couponId) => {
@@ -246,139 +192,83 @@ const GlobalCouponSection = ({ userId }) => {
     };
 
     return (
-        <div className="container mx-auto py-6 px-4">
+        <div className="w-full">
 
             {/* ── CATEGORY BAR ─────────────────────────────────────────────── */}
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div className="mb-6">
 
                 {/* Header row */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '1rem',
-                    flexWrap: 'wrap',
-                    gap: '0.5rem',
-                }}>
+                <div className="flex items-center justify-between mb-3.5 flex-wrap gap-2">
                     <div>
-                        <h2 style={{
-                            fontSize: '1.4rem',
-                            fontWeight: 800,
-                            color: '#0f0c1d',
-                            margin: '0 0 2px',
-                            letterSpacing: '-0.4px',
-                        }}>
+                        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                             Discover Local Deals
                         </h2>
-                        <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0, fontWeight: 500 }}>
+                        <p className="text-xs sm:text-sm text-slate-500 font-normal mt-0.5">
                             {selectedCategory
-                                ? `Showing coupons in "${selectedCategory.name}"`
-                                : 'Browse by category or explore all coupons'}
+                                ? `Showing deals in "${selectedCategory.name}"`
+                                : 'Browse by category or explore all handpicked deals'}
                         </p>
                     </div>
 
                     {selectedCategory && (
                         <button
+                            type="button"
                             onClick={handleClearCategory}
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '6px 14px',
-                                background: 'rgba(55,22,168,0.07)',
-                                border: '1.5px solid rgba(55,22,168,0.2)',
-                                borderRadius: '20px',
-                                fontSize: '0.8rem',
-                                fontWeight: 700,
-                                color: '#3716a8',
-                                cursor: 'pointer',
-                                fontFamily: 'inherit',
-                                transition: 'all 0.15s ease',
-                            }}
+                            title="Clear filter"
+                            aria-label="Clear filter"
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200/80 hover:bg-rose-100 transition cursor-pointer"
                         >
-                            {getCategoryIcon(selectedCategory.name)} {selectedCategory.name}
-                            <span style={{ marginLeft: 4, opacity: 0.7 }}>×</span>
+                            <span>{getCategoryIcon(selectedCategory.name)} {selectedCategory.name}</span>
+                            <span className="text-[11px] font-medium text-rose-600/90 ml-0.5">✕ Clear filter</span>
                         </button>
                     )}
                 </div>
 
                 {/* Scrollable pill row */}
-                <div style={{ position: 'relative' }}>
+                <div className="relative">
 
                     {/* Left arrow */}
                     {canScrollLeft && (
                         <button
+                            type="button"
                             onClick={() => scrollBy(-1)}
                             aria-label="Scroll left"
-                            style={{
-                                position: 'absolute', left: -14, top: '50%',
-                                transform: 'translateY(-50%)', zIndex: 10,
-                                width: 32, height: 32, borderRadius: '50%',
-                                background: 'white', border: '1.5px solid rgba(55,22,168,0.25)',
-                                boxShadow: '0 3px 12px rgba(55,22,168,0.15)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: 'pointer', color: '#3716a8',
-                            }}
+                            className="absolute left-[-12px] top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-slate-50 shadow-sm flex items-center justify-center cursor-pointer transition"
                         >
-                            <ChevronLeft size={15} />
+                            <ChevronLeft size={16} />
                         </button>
                     )}
 
                     {/* Pills track */}
                     <div
                         ref={scrollRef}
+                        className="flex gap-2 overflow-x-auto scroll-smooth py-1 px-1"
                         style={{
-                            display: 'flex',
-                            gap: '10px',
-                            overflowX: 'auto',
-                            scrollBehavior: 'smooth',
-                            padding: '6px 4px 10px',
                             scrollbarWidth: 'none',
                             msOverflowStyle: 'none',
                         }}
                     >
                         {/* All Coupons pill */}
                         <button
+                            type="button"
                             onClick={handleClearCategory}
                             aria-pressed={!selectedCategory}
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '7px',
-                                padding: '8px 18px',
-                                borderRadius: '24px',
-                                border: `1.5px solid ${!selectedCategory ? '#0f0c1d' : '#e5e7eb'}`,
-                                background: !selectedCategory ? '#0f0c1d' : 'white',
-                                color: !selectedCategory ? 'white' : '#374151',
-                                fontSize: '0.82rem',
-                                fontWeight: 700,
-                                whiteSpace: 'nowrap',
-                                cursor: 'pointer',
-                                flexShrink: 0,
-                                boxShadow: !selectedCategory
-                                    ? '0 4px 14px rgba(15,12,29,0.25)'
-                                    : '0 1px 4px rgba(0,0,0,0.06)',
-                                transition: 'all 0.18s ease',
-                                fontFamily: 'inherit',
-                            }}
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                                !selectedCategory
+                                    ? 'bg-indigo-600 text-white shadow-sm -translate-y-0.5'
+                                    : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 shadow-xs'
+                            }`}
                         >
-                            <LayoutGrid size={14} />
-                            All Coupons
+                            <LayoutGrid size={13} />
+                            All Deals
                         </button>
 
                         {/* Skeleton pills while loading */}
                         {catLoading && Array.from({ length: 7 }).map((_, i) => (
                             <div
                                 key={i}
-                                style={{
-                                    height: 38,
-                                    width: 90 + (i % 3) * 35,
-                                    borderRadius: 24,
-                                    flexShrink: 0,
-                                    background: 'linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 50%,#f3f4f6 75%)',
-                                    backgroundSize: '200% 100%',
-                                    animation: 'cat-shimmer 1.4s ease infinite',
-                                }}
+                                className="h-8 rounded-full bg-slate-100 animate-pulse flex-shrink-0"
+                                style={{ width: 90 + (i % 3) * 35 }}
                             />
                         ))}
 
@@ -396,56 +286,35 @@ const GlobalCouponSection = ({ userId }) => {
                     {/* Right arrow */}
                     {canScrollRight && (
                         <button
+                            type="button"
                             onClick={() => scrollBy(1)}
                             aria-label="Scroll right"
-                            style={{
-                                position: 'absolute', right: -14, top: '50%',
-                                transform: 'translateY(-50%)', zIndex: 10,
-                                width: 32, height: 32, borderRadius: '50%',
-                                background: 'white', border: '1.5px solid rgba(55,22,168,0.25)',
-                                boxShadow: '0 3px 12px rgba(55,22,168,0.15)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: 'pointer', color: '#3716a8',
-                            }}
+                            className="absolute right-[-12px] top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-slate-50 shadow-sm flex items-center justify-center cursor-pointer transition"
                         >
-                            <ChevronRight size={15} />
+                            <ChevronRight size={16} />
                         </button>
                     )}
                 </div>
 
-                {/* shimmer keyframes */}
+                {/* Hide webkit scrollbar */}
                 <style>{`
-                    @keyframes cat-shimmer {
-                        0%   { background-position: 200% 0; }
-                        100% { background-position: -200% 0; }
-                    }
-                    /* hide scrollbar in webkit */
                     div::-webkit-scrollbar { display: none; }
                 `}</style>
 
                 {/* Result count when category selected */}
-                {selectedCategory && !catFetching && (
-                    <p style={{
-                        fontSize: '0.78rem',
-                        color: '#6b7280',
-                        fontWeight: 500,
-                        margin: '4px 0 0 4px',
-                    }}>
+                {selectedCategory && !loading && (
+                    <p className="text-xs text-slate-500 font-medium mt-2 ml-1">
                         {displayCoupons.length === 0
-                            ? 'No coupons in this category'
-                            : `${displayCoupons.length} coupon${displayCoupons.length !== 1 ? 's' : ''} found`}
+                            ? `No ${selectedCategory.name} coupons in ${locationName || 'your area'}`
+                            : `${displayCoupons.length} coupon${displayCoupons.length !== 1 ? 's' : ''} found in ${locationName || 'your area'}`}
                     </p>
                 )}
             </div>
 
             {/* ── DIVIDER ──────────────────────────────────────────────────── */}
-            <div style={{
-                height: 1,
-                background: 'linear-gradient(90deg,transparent,rgba(55,22,168,0.1),transparent)',
-                marginBottom: '1.25rem',
-            }} />
+            <div className="border-t border-slate-200/80 my-6" />
 
-            {/* ── EXISTING CONTENT (completely unchanged below) ─────────────── */}
+            {/* ── STATUS, HEADER & ERROR ───────────────────────────────────── */}
             <ErrorDisplay error={error} onClose={() => setError(null)} />
 
             <CouponHeader
@@ -458,13 +327,140 @@ const GlobalCouponSection = ({ userId }) => {
                 locationName={locationName}
             />
 
-            {(loading || catFetching) && displayCoupons.length === 0 && <LoadingSpinner />}
-
-            {!loading && !catFetching && displayCoupons.length === 0 && (
-                <EmptyState onClearFilters={handleClearCategory} />
+            {loading && displayCoupons.length === 0 && expiresSoonCoupons.length === 0 && forYouCoupons.length === 0 && (
+                <LoadingSpinner />
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative">
+            {!loading && displayCoupons.length === 0 && expiresSoonCoupons.length === 0 && forYouCoupons.length === 0 && (
+                <EmptyState
+                    locationSource={locationSource}
+                    locationName={locationName}
+                    categoryName={selectedCategory?.name}
+                    onClearFilters={handleClearCategory}
+                    onRefresh={refreshCouponData}
+                />
+            )}
+
+            {/* ── FOR YOU SECTION ─────────────────────────────────────────── */}
+            {(!loading || forYouCoupons.length > 0) && (displayCoupons.length > 0 || expiresSoonCoupons.length > 0 || forYouCoupons.length > 0) && (
+                <div className="mb-10" id="for-you-section">
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                        <div className="flex items-center gap-2.5">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-xs">
+                                <Sparkles size={13} className="text-indigo-600" />
+                                FOR YOU
+                            </span>
+                            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                                Recommended For You
+                            </h3>
+                        </div>
+                        {forYouCoupons.length > 0 && (
+                            <span className="text-xs font-medium text-slate-500">
+                                {forYouCoupons.length} curated deal{forYouCoupons.length !== 1 ? 's' : ''}
+                            </span>
+                        )}
+                    </div>
+
+                    {forYouCoupons.length > 0 ? (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+                            {forYouCoupons.map((coupon, index) => (
+                                <CouponCard
+                                    key={`foryou-${coupon.id}`}
+                                    coupon={coupon}
+                                    index={index}
+                                    isClaimed={isCouponClaimed(coupon.id)}
+                                    claimingStatus={claimingCoupons[coupon.id]}
+                                    session={session}
+                                    onClaimClick={handleClaimCouponClick}
+                                    onShowQR={showQrCode}
+                                    onToggleDetails={toggleDetails}
+                                    detailsOpen={detailsOpen === coupon.id}
+                                    userId={userId}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl border border-dashed border-indigo-100 p-6 text-center shadow-xs">
+                            <p className="text-sm font-semibold text-slate-800">No Recommendations Available</p>
+                            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                                No personalized deals match this filter yet. Explore all newest deals below or try another category!
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Section separator if either expires soon or main feed has items */}
+                    {(expiresSoonCoupons.length > 0 || displayCoupons.length > 0) && (
+                        <div className="mt-8 pt-6 border-t border-slate-200/70" />
+                    )}
+                </div>
+            )}
+
+            {/* ── EXPIRES SOON SECTION ─────────────────────────────────── */}
+            {expiresSoonCoupons.length > 0 && (
+                <div className="mb-10" id="expires-soon-section">
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                        <div className="flex items-center gap-2.5">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-xs">
+                                <Timer size={13} className="text-rose-600" />
+                                EXPIRES SOON
+                            </span>
+                            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                                Ending in 24 Hours
+                            </h3>
+                        </div>
+                        <span className="text-xs font-medium text-slate-500">
+                            {expiresSoonCoupons.length} deal{expiresSoonCoupons.length !== 1 ? 's' : ''} ending soon
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+                        {expiresSoonCoupons.map((coupon, index) => (
+                            <CouponCard
+                                key={`expiring-${coupon.id}`}
+                                coupon={coupon}
+                                index={index}
+                                isClaimed={isCouponClaimed(coupon.id)}
+                                claimingStatus={claimingCoupons[coupon.id]}
+                                session={session}
+                                onClaimClick={handleClaimCouponClick}
+                                onShowQR={showQrCode}
+                                onToggleDetails={toggleDetails}
+                                detailsOpen={detailsOpen === coupon.id}
+                                userId={userId}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Section separator before main feed */}
+                    {displayCoupons.length > 0 && (
+                        <div className="mt-8 pt-6 border-t border-slate-200/70 flex items-center justify-between">
+                            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                                {selectedCategory ? `${selectedCategory.name} Deals` : "All Local Deals"}
+                            </h3>
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                <ArrowUpDown size={12} className="text-slate-500" />
+                                <span>Newest First</span>
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* If expires soon had no items but we have For You and Main feed, show main feed header */}
+            {expiresSoonCoupons.length === 0 && displayCoupons.length > 0 && forYouCoupons.length > 0 && (
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                        {selectedCategory ? `${selectedCategory.name} Deals` : "All Local Deals"}
+                    </h3>
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                        <ArrowUpDown size={12} className="text-slate-500" />
+                        <span>Newest First</span>
+                    </span>
+                </div>
+            )}
+
+            {/* ── ALL DEALS GRID ───────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 relative">
                 {displayCoupons.map((coupon, index) => (
                     <CouponCard
                         key={coupon.id}
@@ -482,24 +478,24 @@ const GlobalCouponSection = ({ userId }) => {
                 ))}
             </div>
 
-            {/* Infinite Scroll Trigger — only when no category filter active */}
-            {hasMore && !selectedCategory && (
+            {/* Infinite Scroll Trigger */}
+            {hasMore && (
                 <div ref={targetRef} className="flex justify-center py-8">
                     {isFetchingMore ? (
                         <div className="flex items-center space-x-2">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-800" />
-                            <span className="text-gray-600">Loading more coupons...</span>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600" />
+                            <span className="text-xs font-medium text-slate-500">Loading more deals...</span>
                         </div>
                     ) : (
-                        <div className="text-gray-400 text-sm">Scroll down to load more coupons</div>
+                        <div className="text-slate-400 text-xs font-medium">Scroll down to load more deals</div>
                     )}
                 </div>
             )}
 
             {/* End of results */}
             {!hasMore && displayCoupons.length > 0 && (
-                <div className="text-center py-8 text-gray-500">
-                    <div className="border-t border-gray-200 pt-4">
+                <div className="text-center py-8 text-slate-400 text-xs font-medium">
+                    <div className="border-t border-slate-200/80 pt-4">
                         You've reached the end! No more coupons to load.
                     </div>
                 </div>

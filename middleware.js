@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
+import { getToken } from 'next-auth/jwt'
 
 // Define paths that should be accessible without authentication
 const publicPaths = [
@@ -17,6 +18,7 @@ const publicPaths = [
     '/sw.js',
     '/workbox-',
     '/icons',
+    '/businesses',
 ]
 
 // Helper function to check if the current path is public
@@ -60,6 +62,30 @@ export async function middleware(request) {
     // Allow superadmin login page through freely
     if (path.startsWith('/superadmin/login')) {
         return NextResponse.next()
+    }
+
+    // ─────────────────────────────────────────
+    // VENDOR DASHBOARD ROLE ENFORCEMENT
+    // ─────────────────────────────────────────
+    if (path.startsWith('/business/dashboard')) {
+        const token = await getToken({
+            req: request,
+            secret: process.env.NEXTAUTH_SECRET,
+            secureCookie: process.env.NODE_ENV === 'production'
+        });
+
+        // Unauthenticated -> redirect to signin
+        if (!token) {
+            const loginUrl = new URL('/auth/signin', request.url);
+            loginUrl.searchParams.set('callbackUrl', request.url);
+            return NextResponse.redirect(loginUrl);
+        }
+
+        const roles = Array.isArray(token.roles) ? token.roles : [];
+        if (!roles.includes('app_business_owner') && !roles.includes('superadmin')) {
+            // Customer without vendor role -> redirect to business registration
+            return NextResponse.redirect(new URL('/u/profile/apply-for-business', request.url));
+        }
     }
 
     // ─────────────────────────────────────────

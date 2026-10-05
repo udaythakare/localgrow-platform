@@ -1,195 +1,282 @@
+'use client';
+
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Check,
-  ChevronDown,
-  ChevronUp,
   QrCode,
   Scissors,
-  Timer,
   Store,
   X,
   MapPin,
-  Flame
+  Tag,
+  Ticket,
+  Clock,
+  Star,
+  Calendar,
 } from "lucide-react";
 
 import { joinAddress } from "@/utils/addressUtils";
-import ClaimsCounter from "@/app/business/dashboard/coupons/components/ClaimCounter";
+import {
+  getBusinessInitials,
+  formatDisplayDate,
+  formatTime12h,
+} from "@/helpers/businessDetailsHelpers";
+import CustomerClaimsCounter from "@/components/GlobalCouponComp/CustomerClaimsCounter";
 
 export const CouponCard = ({
   coupon,
   isClaimed,
   claimingStatus,
-  session,
+  session = true,
   onClaimClick,
   onShowQR,
   onToggleDetails,
-  userId
+  detailsOpen,
+  userId,
 }) => {
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric"
-    });
-  };
+  if (!coupon) return null;
 
-  const getProgressBarWidth = (current, max) => {
-    if (!current || !max) return "0%";
-    return `${Math.min((current / max) * 100, 100)}%`;
-  };
+  const business = coupon.businesses || {};
+  const businessId = business.id || coupon.business_id;
+  const businessName = business.name || "Local Merchant";
+  const logoUrl = business.logo_url || null;
+  const categoryName = business.business_categories?.name || null;
 
-  const handleToggleDetails = () => {
-    setDetailsOpen(!detailsOpen);
-    if (onToggleDetails) onToggleDetails(coupon.id);
-  };
+  // Primary location resolution
+  const primaryLocation = Array.isArray(business.business_locations) && business.business_locations.length > 0
+    ? business.business_locations[0]
+    : null;
+
+  const locationId = primaryLocation?.id || null;
+  const storeAddress = primaryLocation ? joinAddress(primaryLocation) : null;
+  const locationCity = primaryLocation?.city || primaryLocation?.area || null;
+
+  // Store details URL
+  const storeUrl = businessId
+    ? (locationId ? `/businesses/${businessId}?locationId=${locationId}` : `/businesses/${businessId}`)
+    : '#';
+
+  // Business rating from reviews
+  const businessRating = typeof coupon.business_rating === 'number'
+    ? coupon.business_rating
+    : (typeof business.rating === 'number' ? business.rating : 0);
+  const ratingCount = typeof coupon.rating_count === 'number' ? coupon.rating_count : 0;
+
+  // Dates and timings
+  const expiryFormatted = formatDisplayDate(coupon.end_date);
+  const startFormatted = formatDisplayDate(coupon.start_date);
+  const validityRange = startFormatted && expiryFormatted
+    ? `${startFormatted} – ${expiryFormatted}`
+    : (expiryFormatted ? `Ends ${expiryFormatted}` : null);
+
+  const hasSpecificHours =
+    coupon.redemption_time_type === 'specific_hours' &&
+    coupon.redemption_start_time &&
+    coupon.redemption_end_time;
+
+  const isFullyClaimed =
+    coupon.max_claims != null &&
+    (coupon.current_claims ?? 0) >= coupon.max_claims;
+
+  const isClaiming = claimingStatus === 'claiming';
+
+  const couponImageUrl = coupon.image_url;
 
   return (
-    <div className="w-full bg-white border-2 border-black flex flex-col"
-      style={{ boxShadow: '3px 3px 0px 0px rgba(0,0,0,1)' }}>
+    <article
+      id={`coupon-card-${coupon.id}`}
+      className="flex flex-col h-full rounded-xl border border-slate-200/90 bg-white shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+    >
+      {/* 1. DEAL IMAGE AREA (Upper 25-30% compact image) */}
+      <div className="relative w-full h-24 sm:h-28 bg-slate-100 flex-shrink-0 overflow-hidden">
+        {couponImageUrl ? (
+          <img
+            src={couponImageUrl}
+            alt={coupon.title || "Coupon offer"}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-200">
+            <Ticket size={24} className="opacity-50" />
+          </div>
+        )}
+        
+        {/* Subtle gradient overlay for readability of badges */}
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-black/40 via-transparent to-transparent pointer-events-none" />
+        
+        <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between items-start pointer-events-none">
+          {/* Top Left: Category */}
+          {categoryName ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-semibold bg-slate-100/95 text-slate-700 shadow-sm backdrop-blur-sm uppercase tracking-wide">
+              <Tag size={8} className="text-slate-500" />
+              {categoryName}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-semibold bg-slate-100/95 text-slate-700 shadow-sm backdrop-blur-sm uppercase tracking-wide">
+              Deal
+            </span>
+          )}
 
-      {/* ── TOP BAR ── */}
-      <div
-        className="px-3 py-2 flex items-center justify-between text-xs font-bold text-white"
-        style={{ background: "linear-gradient(90deg,#3716A8,#2C1288)" }}
-      >
-        <span className="flex items-center gap-1.5">
-          <Flame size={13} strokeWidth={2.5} />
-          Hot Deal
-        </span>
-        <span className="text-white/80 font-semibold">
-          Ends {formatDate(coupon.end_date)}
-        </span>
+          {/* Top Right: Locality */}
+          {locationCity && (
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-semibold bg-indigo-50/95 text-indigo-700 shadow-sm backdrop-blur-sm"
+              aria-label={`Location: ${locationCity}`}
+            >
+              <MapPin size={8} />
+              {locationCity}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* ── BODY ── */}
-      <div className="p-3 flex flex-col gap-2 flex-grow">
-
-        {/* Title */}
-        <h2 className="text-sm font-black text-gray-900 line-clamp-2 leading-tight">
-          {coupon.title}
-        </h2>
-
-        {/* Store */}
-        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-          <Store size={12} strokeWidth={2.5} />
-          <span className="font-bold truncate">
-            {coupon?.businesses?.name || "Vendor"}
-          </span>
+      <div className="flex flex-col flex-1 p-2 sm:p-2.5">
+        {/* 2. MERCHANT IDENTITY */}
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-slate-100 bg-slate-50 overflow-hidden shadow-xs flex-shrink-0 flex items-center justify-center">
+            {logoUrl && !logoFailed ? (
+              <img
+                src={logoUrl}
+                alt={`${businessName} logo`}
+                className="w-full h-full object-contain p-0.5"
+                onError={() => setLogoFailed(true)}
+              />
+            ) : (
+              <div
+                className="w-full h-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[9px] select-none"
+                aria-label={`${businessName} brand icon`}
+              >
+                {getBusinessInitials(businessName)}
+              </div>
+            )}
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-1">
+              <h3 className="text-xs font-bold text-slate-900 tracking-tight truncate">
+                <Link
+                  href={storeUrl}
+                  className="hover:text-indigo-600 transition-colors"
+                >
+                  {businessName}
+                </Link>
+              </h3>
+              {businessRating > 0 && (
+                <div className="flex items-center gap-0.5 font-semibold text-[9px] text-slate-700 flex-shrink-0">
+                  <Star size={8} className="fill-amber-400 text-amber-400" />
+                  <span>{Number(businessRating).toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Description */}
-        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
-          {coupon.description || "No description available"}
-        </p>
+        {/* 3. OFFER */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1 mb-0.5">
+            <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider truncate">
+              {coupon.coupon_type ? coupon.coupon_type.replace(/_/g, ' ') : 'Offer'}
+            </span>
+            {expiryFormatted && (
+              <span className="text-[9px] font-medium text-slate-400 whitespace-nowrap">
+                Exp {expiryFormatted}
+              </span>
+            )}
+          </div>
+          
+          <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug line-clamp-2 mb-0.5">
+            {coupon.title}
+          </h4>
+          
+          {coupon.description && (
+            <p className="text-[10px] text-slate-500 line-clamp-1 leading-normal mb-1">
+              {coupon.description}
+            </p>
+          )}
 
-        {/* Claims Counter + Progress */}
-        <div>
-          <ClaimsCounter
+          {hasSpecificHours && (
+            <div className="flex items-center gap-1 text-[9px] text-slate-500 mb-1">
+              <Clock size={8} className="text-slate-400 flex-shrink-0" />
+              <span className="truncate">{formatTime12h(coupon.redemption_start_time)}–{formatTime12h(coupon.redemption_end_time)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* 4. CLAIMS PROGRESS */}
+        <div className="my-1.5">
+          <CustomerClaimsCounter
             couponId={coupon.id}
             initialCount={coupon.current_claims}
             maxClaims={coupon.max_claims}
             userId={userId}
           />
-          <div className="w-full bg-gray-200 h-1.5 mt-1 overflow-hidden">
-            <div
-              className="h-full transition-all duration-300"
-              style={{
-                width: getProgressBarWidth(coupon.current_claims, coupon.max_claims),
-                background: "#3716A8"
-              }}
-            />
-          </div>
         </div>
 
-        {/* Dashed Divider */}
-        <div className="border-t border-dashed border-gray-300" />
+        {/* 5. ACTIONS */}
+        <div className="pt-1.5 border-t border-slate-100 mt-auto flex gap-1.5">
+          <Link
+            href={storeUrl}
+            aria-label={`View store details for ${businessName}`}
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-lg text-[10px] sm:text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] transition-all text-center"
+          >
+            <Store size={11} className="text-indigo-600 flex-shrink-0" />
+            <span className="hidden sm:inline">View Details</span>
+            <span className="sm:hidden">Details</span>
+          </Link>
 
-        {/* Expandable Details */}
-        {detailsOpen && (
-          <div className="text-xs text-gray-600 space-y-1.5">
-            <div className="flex items-start gap-1.5">
-              <MapPin size={12} className="flex-shrink-0 mt-0.5" />
-              <span className="leading-snug">
-                {coupon?.businesses?.business_locations?.[0]
-                  ? joinAddress(coupon.businesses.business_locations[0])
-                  : "Store location"}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 font-semibold" style={{ color: "#3716A8" }}>
-              <Timer size={12} />
-              {formatDate(coupon.start_date)} – {formatDate(coupon.end_date)}
-            </div>
-          </div>
-        )}
-
-        {/* Toggle Details */}
-        <button
-          onClick={handleToggleDetails}
-          className="text-xs font-bold flex items-center gap-1 w-fit active:scale-95 transition-transform"
-          style={{ color: "#3716A8" }}
-        >
-          {detailsOpen
-            ? <><ChevronUp size={13} /> Hide details</>
-            : <><ChevronDown size={13} /> View details</>
-          }
-        </button>
-
-        {/* ── ACTION BUTTONS ── */}
-        <div className="mt-auto pt-1">
           {isClaimed ? (
-            <div className="flex gap-2">
+            <div className="flex-1 flex gap-1">
               <button
                 disabled
-                className="flex-1 bg-green-600 text-white text-xs font-bold py-2.5 border-2 border-black flex items-center justify-center gap-1.5"
+                className="flex-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] sm:text-xs font-semibold py-1.5 px-1 rounded-lg flex items-center justify-center gap-1 cursor-default"
               >
-                <Check size={13} strokeWidth={2.5} />
+                <Check size={11} className="stroke-[2.5]" />
                 Claimed
               </button>
               <button
+                type="button"
                 onClick={() => onShowQR(coupon)}
-                className="px-3 bg-black text-white text-xs font-bold py-2.5 border-2 border-black hover:bg-gray-800 active:scale-95 flex items-center gap-1 transition-all"
+                title="Show QR Code"
+                className="px-1.5 bg-slate-900 text-white text-[10px] sm:text-xs font-semibold py-1.5 rounded-lg hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-xs"
               >
-                <QrCode size={14} />
+                <QrCode size={12} />
               </button>
             </div>
-
-          ) : coupon.current_claims >= coupon.max_claims ? (
+          ) : isFullyClaimed ? (
             <button
               disabled
-              className="w-full bg-gray-200 text-gray-500 text-xs font-bold py-2.5 border-2 border-black flex items-center justify-center gap-1.5"
+              className="flex-1 bg-slate-100 text-slate-400 text-[10px] sm:text-xs font-semibold py-1.5 px-1.5 rounded-lg flex items-center justify-center gap-1 cursor-not-allowed"
             >
-              <X size={13} strokeWidth={2.5} />
-              Fully Claimed
+              <X size={11} />
+              <span className="hidden sm:inline">Fully Claimed</span>
+              <span className="sm:hidden">Full</span>
             </button>
-
-          ) : claimingStatus === "claiming" ? (
+          ) : isClaiming ? (
             <button
               disabled
-              className="w-full bg-gray-100 text-gray-500 text-xs font-bold py-2.5 border-2 border-black"
+              className="flex-1 bg-indigo-50 text-indigo-400 text-[10px] sm:text-xs font-semibold py-1.5 px-1.5 rounded-lg flex items-center justify-center gap-1 cursor-wait"
             >
               Claiming...
             </button>
-
           ) : (
             <button
+              type="button"
               onClick={() => onClaimClick(coupon)}
               disabled={!session}
-              className={`w-full text-xs font-bold py-2.5 border-2 border-black flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
-                !session
-                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                  : "text-white hover:opacity-90"
+              className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-lg text-[10px] sm:text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] shadow-xs hover:shadow transition-all text-center ${
+                !session ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
               }`}
-              style={session ? { background: "#3716A8" } : {}}
             >
-              <Scissors size={13} strokeWidth={2.5} />
-              {!session ? "Sign in to claim" : "Claim Coupon"}
+              <Scissors size={11} />
+              <span className="hidden sm:inline">Claim Deal</span>
+              <span className="sm:hidden">Claim</span>
             </button>
           )}
         </div>
-
       </div>
-    </div>
+    </article>
   );
 };

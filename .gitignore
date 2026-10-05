@@ -30,8 +30,34 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
+
+# backend build
+target/
+backend/target/
+target
+backend/target
+*.jar
+*.war
+
+# IDE
+.idea/
+backend/.idea/
+.idea
+backend/.idea
+*.iml
+.vscode/
+.vscode
+
+# logs
+*.log
+
+# local test/debug files
+localgrow_test_dataset.sql
+audit*.js
+get_schema*.js
 
 # vercel
 .vercel

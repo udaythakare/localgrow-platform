@@ -4,7 +4,6 @@
 // Keys for localStorage
 const STORAGE_KEYS = {
     COUPONS: 'app_coupons',
-    SELECTED_AREA: 'app_selected_area',
     LOADING: 'app_loading_state',
     LAST_SYNC: 'app_last_sync_time',
     LOCATION_SOURCE: 'app_location_source',
@@ -51,17 +50,7 @@ export const areCouponsStale = () => {
     return age > MAX_CACHE_AGE;
 };
 
-// Function to save selected area to localStorage
-export const saveSelectedArea = (area) => {
-    localStorage.setItem(STORAGE_KEYS.SELECTED_AREA, area || '');
-    // Dispatch a custom event to notify components of the change
-    window.dispatchEvent(new CustomEvent('area-updated'));
-};
 
-// Function to get selected area from localStorage
-export const getSelectedArea = () => {
-    return localStorage.getItem(STORAGE_KEYS.SELECTED_AREA) || '';
-};
 
 // Function to save loading state
 export const saveLoadingState = (isLoading) => {
@@ -87,12 +76,7 @@ export const getLastSyncTime = () => {
     return timestampStr ? parseInt(timestampStr, 10) : 0;
 };
 
-// Function to clear all filters
-export const clearAllFilters = () => {
-    saveSelectedArea('');
-    // Don't clear the coupons yet, as we'll need to fetch all coupons separately
-    window.dispatchEvent(new CustomEvent('filters-cleared'));
-};
+
 
 // Function to determine if we need to refresh data based on time
 export const shouldRefreshData = () => {

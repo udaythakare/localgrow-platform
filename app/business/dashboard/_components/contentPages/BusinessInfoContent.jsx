@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import BusinessInfoForm from "../BusinessInfoForm";
+import OperatingHoursManager from "../OperatingHoursManager";
+import BusinessBrandingManager from "../BusinessBrandingManager";
 import { useLanguage } from "@/context/LanguageContext";
 
 export default function BusinessInfoContent() {
@@ -236,6 +238,30 @@ export default function BusinessInfoContent() {
           <Info label={t?.business?.country ?? "Country"} value={businessInfo?.country} />
 
         </div>
+
+      </SectionCard>
+
+
+      {/* OPERATING HOURS */}
+
+      <SectionCard title={`🕒 ${t?.business?.operatingHours ?? "Store Operating Hours"}`}>
+
+        <OperatingHoursManager
+          locationId={businessInfo?.locationId || businessInfo?.id}
+          initialTimezone={businessInfo?.timezone || "Asia/Kolkata"}
+        />
+
+      </SectionCard>
+
+
+      {/* STORE BRANDING & PHOTOS */}
+
+      <SectionCard title={`🖼️ ${t?.business?.branding ?? "Store Branding & Gallery Photos"}`}>
+
+        <BusinessBrandingManager
+          businessId={businessInfo?.businessId || businessInfo?.id}
+          initialLogoUrl={businessInfo?.logo_url}
+        />
 
       </SectionCard>
 

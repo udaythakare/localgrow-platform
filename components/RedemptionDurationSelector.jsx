@@ -1,5 +1,10 @@
 import React from 'react';
 
+/**
+ * @deprecated Obsolete in LocalGrow.
+ * Coupon validity is now authoritative via coupon.start_date and coupon.end_date.
+ * Preserved for backward compatibility with existing component imports.
+ */
 const RedemptionDurationSelector = ({ value, onChange }) => {
     const durations = ['5 minutes', '10 minutes'];
 

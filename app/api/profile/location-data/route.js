@@ -31,7 +31,7 @@ export async function GET(request) {
             .from("user_locations")
             .select("*")
             .eq("user_id", userId)
-            .single();
+            .maybeSingle();
 
         if (error) {
             console.error("Error fetching user location data:", error);
@@ -46,7 +46,7 @@ export async function GET(request) {
         }
 
         return new NextResponse(
-            JSON.stringify({ success: true, data: data || {} }),
+            JSON.stringify({ success: true, data: data || null }),
             { status: 200, headers }
         );
     } catch (err) {

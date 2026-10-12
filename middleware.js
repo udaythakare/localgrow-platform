@@ -19,6 +19,7 @@ const publicPaths = [
     '/workbox-',
     '/icons',
     '/businesses',
+    '/verify', // email verification landing page — must be reachable without a session
 ]
 
 // Helper function to check if the current path is public

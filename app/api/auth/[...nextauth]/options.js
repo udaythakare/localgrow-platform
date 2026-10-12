@@ -55,6 +55,19 @@ export const options = {
                     throw new Error('Invalid password');
                 }
 
+                // Enforce email verification for Credentials (password-based) accounts.
+                // Google OAuth users are exempt — their identity is verified by Google.
+                const { data: roleVerification } = await supabaseAdmin
+                    .from('user_roles')
+                    .select('is_verified')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (!roleVerification?.is_verified) {
+                    await logLogin(user.id, 'failed', 'Email not verified');
+                    throw new Error('Please verify your email address before signing in. Check your inbox or request a new verification link.');
+                }
+
                 // Check if user location exists, if not create default
                 const { data: userLocation, error: locationError } = await supabaseAdmin
                     .from('user_locations')
